@@ -1,97 +1,92 @@
 const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcrypt');
+const knex = require('knex')({
+    client: 'pg',
+    connection : {
+        host: '127.0.0.1',
+        user: '',
+        port: '5430',
+        password: '',
+        database: 'smart_brain'
+    }
+});
+
 const app = express();
 const PORT = 3004 || process.env.PORT;
-const bodyParser = require('body-parser');
-app.use(bodyParser.json());
+app.use(express.json())
+app.use(cors());
 
-const bcrypt = require('bcrypt');
+
+
+// knex.select('*').from('users')
+// let result = knex.select('*').from('users').then(data => {
+//     console.log(data)
+// })
+// console.log(result)
 const saltRounds = 10;
 // const myPlaintextPassword = 's0/\/\P4$$w0rD';
 // const someOtherPlaintextPassword = 'not_bacon';
 
-const database =  {
-    users: [
-        {id: 123, name: 'John', entries: 0, joined: new Date()},
-        {id: 1234, name: 'Sabrina', entries: 0, joined: new Date()}
-    ]
-}
-
-
-app.get('/', (req, res) => {
-    res.send(database.users)
-})
 app.post('/signin', (req, res) => {
-    const {password, name} = req.body;
-    if(req.body){
-        bcrypt.compare(password, hash, function(err, result) {
-          if(err){
-            res.json('Could not login')
-          } else {
-            res.json(result);
-          }
-        });
-        // bcrypt.compare(someOtherPlaintextPassword, hash, function(err, result) {
-        //     // result == false
-        // });
-        //console.log(req.body);
-        //console.log(database);
-        res.json('Signing in completed')
-    } else {
-        res.json('Error logging in')
-    }
-    
+    console.log('Hit the sign in', req.body)
+    const {password, email} = req.body;
+    knex.select('hash', 'email').from('login')
+    .where('email', '=', email)
+    .then(data => {
+        const isValid = bcrypt.compareSync(password, data[0].hash);
+        if(isValid){
+           return knex.select('*').from('users').where('email', '=', email)
+            .then(user => res.json(user[0]))
+            .catch(err => res.status(400).json({err: 'Unable to get user'}))
+        } else {
+            res.status(400).json('Wrong credentails')
+        }
+    })
+    .catch(err => res.status(400).json(err));
+    console.log('Was able to login user')
 })
 app.post('/register', (req, res) => {
-    const {name, password} = req.body;
-    bcrypt.genSalt(saltRounds, function(err, salt) {
-        if(err){
-            res.json('Could not store information')
-        }
-        bcrypt.hash(password, salt, function(err, hash) {
-            // Store hash in your password DB.
-        });
-    });
-    
-    if(req.body){
-        database.users.push({
-            id: 12345,
+    const {name, email, password} = req.body;
+    const hash = bcrypt.hashSync(password, saltRounds);
+    knex.transaction(trx => {
+      trx.insert({
+        hash: hash,
+        email: email
+      })
+      .into('login')
+      .returning('email')
+      .then(loginEmail => {
+        return trx('users')
+          .returning('*')
+          .insert({
+            email: loginEmail[0].email,
             name: name,
-            password: password,
-            entries: 0,
             joined: new Date()
-        });
-        res.json(database.users[database.users.length -1]);
-        console.log(database)
-    } else {
-        res.json('User was not craeted')
-    }
+          })
+          .then(user => {
+            res.json(user[0]);
+          })
+      })
+      .then(trx.commit)
+      .catch(trx.rollback)
+    })
+    .catch(err => res.status(400).json(err))
 })
 app.get('/profile/:id', (req, res) => {
     const {id} = req.params;
-    let found = false;
-    database.users.forEach(user => {
-        if(user.id == id){
-            found = true;
-            res.json(user)
-        } else {
-            res.status(404).json("no user found")
-        }
-    })
-    if(!found){
-        res.status(400).json('Not Found')
-    }
+    knex.select('*').where({
+        id: id
+    }).from('users').then(user => res.json(user[0])).catch(err => res.json({err: 'Not Found'}))
 })
-app.post('/image', (req, res) => {
+app.put('/image', (req, res) => {
     const {id} = req.params;
-    let found = false;
-    database.users.forEach(user => {
-        if(user.id === id){
-            found = true;
-            return res.json(user)
-        } else {
-            return res.json('Image not found')
-        }
-    })
+    console.log(id)
+    knex.where('id', '=', id)
+    .increment('entries', 1)
+    .returning('entries')
+    .then(entries => res.json(entries[0].entries))
+    .catch(err => res.status(400).json({err: 'Unable to set the count'}))
 })
 
 app.listen(PORT, () => {
