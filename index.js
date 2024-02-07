@@ -22,6 +22,10 @@ app.use(cors());
 
 const saltRounds = 10;
 
+app.get('/', (req, res) => {
+    res.send('Server is working')
+})
+
 app.post('/signin', (req, res) => {
     const {password, email} = req.body;
     if(!email || !password){
@@ -44,6 +48,7 @@ app.post('/signin', (req, res) => {
 })
 app.post('/register', (req, res) => {
     const {name, email, password} = req.body;
+    console.log('Registering')
     if(!email || !name || !password){
         return res.status(400).json({err: 'Incorrect Form Submission'})
     }
