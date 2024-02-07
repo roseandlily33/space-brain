@@ -29,8 +29,10 @@ const saltRounds = 10;
 // const someOtherPlaintextPassword = 'not_bacon';
 
 app.post('/signin', (req, res) => {
-    console.log('Hit the sign in', req.body)
     const {password, email} = req.body;
+    if(!email || !password){
+        return res.status(400).json({err: 'Incorrect Form Submission'})
+    }
     knex.select('hash', 'email').from('login')
     .where('email', '=', email)
     .then(data => {
@@ -48,6 +50,9 @@ app.post('/signin', (req, res) => {
 })
 app.post('/register', (req, res) => {
     const {name, email, password} = req.body;
+    if(!email || !name || !password){
+        return res.status(400).json({err: 'Incorrect Form Submission'})
+    }
     const hash = bcrypt.hashSync(password, saltRounds);
     knex.transaction(trx => {
       trx.insert({
