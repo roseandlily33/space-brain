@@ -1,14 +1,17 @@
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
+require('dotenv').config();
 const knex = require('knex')({
     client: 'pg',
     connection : {
-        host: '127.0.0.1',
-        user: '',
-        port: '5430',
-        password: '',
-        database: 'smart_brain'
+        connectionString: process.env.DB_URL,
+        ssl: {rejectUnauthorized: false},
+        host: process.env.DB_HOST,
+        port: 5432,
+        user: process.env.DB_USER,
+        password: process.env.DB_PW,
+        database: process.env.DB_DB
     }
 });
 
@@ -17,16 +20,7 @@ const PORT = 3004 || process.env.PORT;
 app.use(express.json())
 app.use(cors());
 
-
-
-// knex.select('*').from('users')
-// let result = knex.select('*').from('users').then(data => {
-//     console.log(data)
-// })
-// console.log(result)
 const saltRounds = 10;
-// const myPlaintextPassword = 's0/\/\P4$$w0rD';
-// const someOtherPlaintextPassword = 'not_bacon';
 
 app.post('/signin', (req, res) => {
     const {password, email} = req.body;
